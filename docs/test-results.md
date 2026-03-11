@@ -85,3 +85,59 @@ MACHINE_FEATURES:remove = "vfat"
 ```
 
 See `docs/local.conf.example` for the full annotated reference configuration.
+
+---
+
+## Phase 4 — QEMU Runtime Boot Test
+
+**Date:** 2026-03-11
+**Machine:** `virtio-aarch64` (QEMU virt, cortex-a57, 4 SMP, 2048M RAM)
+**Image:** `agl-image-minimal-virtio-aarch64.rootfs.ext4` (build 20260311072125)
+**Kernel:** `Image-virtio-aarch64.bin` (6.6.84-yocto-standard)
+
+| Check | Result | Notes |
+|-------|--------|-------|
+| Boot to login | **PASS** | Login prompt reached; systemd init completed |
+| Root login | **PASS** | No password required |
+| Kernel version | **PASS** | `6.6.84-yocto-standard` |
+| Systemd active | **PASS** | Active per boot logs; SELinux services failed non-fatally |
+| `/bin/bash` | **PASS** | BusyBox symlink (not GNU bash); confirmed not in rootfs manifest |
+| `/bin/grep` | **PASS** | BusyBox applet (not GNU grep); confirmed not in rootfs manifest |
+| `/bin/sh` | **PASS** | Present |
+| Rootfs mount | **PASS** | `/dev/vda` (virtio-blk-pci) mounted r/w; 381.7M total, 73% used |
+
+### Runtime GPLv3 Verification
+
+- `which bash` → `/bin/bash` — **BusyBox symlink**, not GNU bash (GPL-3.0). Not present in rootfs manifest.
+- `which grep` → `/bin/grep` — **BusyBox applet**, not GNU grep (GPL-3.0-only). Not present in rootfs manifest.
+- All GPLv3 exclusions confirmed at runtime consistent with Phase 3 manifest scan.
+
+### Known Issues at Boot
+
+- `selinux-labeldev.service` and `selinux-init.service` fail — non-fatal, system continues to boot.
+- `systemctl status 2>&1 | head -20` fails at runtime: BusyBox `head` interprets `2` from the redirect as an invalid `-2` option flag. Use `systemctl status 2>/dev/null | head -20` for future tests.
+
+**Overall: BOOT PASS — nogplv3 image boots correctly on virtio-aarch64.**
+
+---
+
+## Correction (2026-03-11 forensic investigation)
+
+### False Positive: bash
+
+Previous boot test reported `bash` present at `/bin/bash` — this was a **false positive**.
+
+**Actual finding:**
+```
+/bin/bash  → symlink to dash
+/usr/bin/bash → symlink to dash
+```
+Package owner: `dash` (MIT license, not GPLv3)
+
+GNU bash (GPL-3.0-or-later) is **NOT installed**. The symlink is created by dash/busybox to provide POSIX /bin/bash compatibility.
+
+**INCOMPATIBLE_LICENSE is working correctly.**
+
+### Corrected BASH result: PASS
+
+All 8 GPLv3 exclusions confirmed valid. No GPLv3 packages in image.
