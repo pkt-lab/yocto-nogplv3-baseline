@@ -118,3 +118,37 @@ bitbake -g agl-image-minimal && grep '"mc"\|"screen"' pn-depends.dot
 ```
 If hard deps exist, trace them and patch the upstream recipe or add a
 bbappend removing the dependency.
+
+---
+
+## 9. connman-client not produced when readline is excluded *(RESOLVED in Phase 3)*
+
+**Issue:** `packagegroup-agl-core-connectivity` has a hard `RDEPENDS` on
+`connman-client`. When `readline` (GPL-3.0-or-later) is excluded via
+`INCOMPATIBLE_LICENSE`, the connman `client` PACKAGECONFIG is disabled and
+the `connman-client` RPM is never built. DNF fails during rootfs assembly
+with "nothing provides connman-client".
+
+**Resolution:**
+- `meta-nogplv3/recipes-connectivity/connman/connman_%.bbappend` disables
+  `PACKAGECONFIG[client]` to prevent build attempts against readline.
+- `meta-nogplv3/recipes-platform/packagegroups/packagegroup-agl-core-connectivity.bbappend`
+  removes `connman-client` from `RDEPENDS` so dependency resolution succeeds.
+
+**Alternative:** Replace connman with NetworkManager (no readline dep) or
+implement a readline-free connman client using libedit (BSD-2-Clause).
+
+---
+
+## 10. kbd-keymaps incorrectly excluded — caused systemd-vconsole-setup failure *(RESOLVED in Phase 3)*
+
+**Issue:** Early config set `BAD_RECOMMENDATIONS += "... kbd kbd-keymaps ..."`.
+`kbd-keymaps` license is `GPL-2.0-or-later` (NOT GPL-3.0). `systemd-vconsole-setup`
+has a hard `RDEPENDS` on `kbd-keymaps`, so excluding it caused DNF to fail:
+"nothing provides kbd-keymaps".
+
+**Root cause:** Only `kbd-keymaps-pine` is GPL-3.0-or-later. The main `kbd`
+package and `kbd-keymaps` are GPL-2.0-or-later.
+
+**Resolution:** Updated `BAD_RECOMMENDATIONS` to exclude only `dosfstools` and
+`kbd-keymaps-pine`. Corrected associated comment in `local.conf`.
