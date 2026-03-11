@@ -1,0 +1,100 @@
+# =============================================================================
+# GPLv3 Removal Baseline — local.conf snippets
+# Tested on: AGL Terrific Trout 19.92.0 / Yocto Scarthgap 5.0 / qemuarm64
+# =============================================================================
+#
+# USAGE:
+#   Copy the sections you need into your build/conf/local.conf.
+#   Read all comments before applying — each setting has known tradeoffs.
+#
+# VALIDATION:
+#   Do not ship without running the GPLv3 scan script after rebuild:
+#     scripts/gplv3-scan.sh <builddir>
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Block GPL-3.0 and LGPL-3.0 target packages
+# -----------------------------------------------------------------------------
+# This causes bitbake to error if a target-class recipe has an incompatible
+# license. It does NOT affect native/nativesdk/build-host tools.
+#
+# Tradeoff: Will cause build failures for packages that have no replacement.
+# You must either replace the package or add it to INCOMPATIBLE_LICENSE_EXCEPTIONS.
+
+INCOMPATIBLE_LICENSE:class-target = "GPL-3.0* LGPL-3.0* AGPL-3.0*"
+
+# -----------------------------------------------------------------------------
+# 2. GCC Runtime Library Exception — always add these
+# -----------------------------------------------------------------------------
+# libgcc and libstdc++ use GPL-3.0-with-GCC-exception.
+# The GCC Runtime Library Exception explicitly permits binary distribution.
+# These MUST be added or your build will fail on almost any C++ project.
+
+INCOMPATIBLE_LICENSE_EXCEPTIONS = " \
+    libgcc:GPL-3.0-with-GCC-exception \
+    libstdc++:GPL-3.0-with-GCC-exception \
+"
+
+# -----------------------------------------------------------------------------
+# 3. Dual-license packages — elect the GPLv2 side
+# -----------------------------------------------------------------------------
+# These packages are licensed under "A | B" where B is LGPLv3/GPLv3.
+# By adding them to exceptions with the GPLv2-compatible license, we
+# signal the GPLv2 election. The build will use the GPLv2 side.
+#
+# Packages: gmp, libidn2, libunistring, nettle
+
+INCOMPATIBLE_LICENSE_EXCEPTIONS += " \
+    gmp:LGPL-3.0-or-later \
+    libidn2:LGPL-3.0-only \
+    libunistring:LGPL-3.0-or-later \
+    nettle:LGPL-3.0-or-later \
+"
+
+# -----------------------------------------------------------------------------
+# 4. Prefer BusyBox for base utilities
+# -----------------------------------------------------------------------------
+# Replace coreutils, grep, findutils with BusyBox equivalents.
+# BusyBox is GPL-2.0-only.
+#
+# RISK: BusyBox is not fully feature-equivalent to GNU coreutils.
+# Shell scripts relying on GNU-specific flags may break.
+# AGL minimal already uses busybox ash — bash is not present.
+
+VIRTUAL-RUNTIME_base-utils = "busybox"
+VIRTUAL-RUNTIME_login_manager = "busybox"
+VIRTUAL-RUNTIME_dev_manager = "udev"
+
+# Prevent GNU coreutils/findutils/grep from being pulled in as deps
+# (uncomment after testing — aggressive, may cause failures)
+# PREFERRED_PROVIDER_coreutils = "busybox"
+
+# -----------------------------------------------------------------------------
+# 5. Remove non-essential GPLv3 packages
+# -----------------------------------------------------------------------------
+# mc (Midnight Commander) and screen are in AGL minimal but non-essential.
+# Removing them eliminates two GPL-3.0-only packages cleanly.
+
+# Add to image blacklist (distro-specific mechanism):
+# BAD_RECOMMENDATIONS += "mc screen"
+
+# Or explicitly exclude from image install:
+# IMAGE_INSTALL:remove = "mc screen"
+
+# -----------------------------------------------------------------------------
+# 6. readline — replacement option
+# -----------------------------------------------------------------------------
+# readline (GPL-3.0-or-later) is pulled in by packages needing interactive
+# line editing. Replacement: libedit (BSD license).
+#
+# Not all packages accept libedit — test carefully.
+# PREFERRED_PROVIDER_readline = "libedit"
+
+# -----------------------------------------------------------------------------
+# 7. kbd — exception if keyboard support needed
+# -----------------------------------------------------------------------------
+# kbd (GPL-3.0-or-later) provides keyboard maps.
+# If targeting headless/embedded: remove it.
+# If keyboard support required: add exception.
+#
+# INCOMPATIBLE_LICENSE_EXCEPTIONS += "kbd:GPL-3.0-or-later"
