@@ -140,6 +140,39 @@ implement a readline-free connman client using libedit (BSD-2-Clause).
 
 ---
 
+## 11. Demo image unbuildable — `parted` (GPL-3.0) blocks udisks2 dependency chain
+
+**Issue:** `agl-ivi-demo-qt` and `agl-ivi-demo-control-panel` cannot be built
+under `INCOMPATIBLE_LICENSE:class-target = "GPL-3.0*"` because `libblockdev`
+has a hard `DEPENDS` on `parted`, which is GPL-3.0-or-later.
+
+**Dependency chain:**
+```
+agl-ivi-demo-qt → packagegroup-agl-demo-platform → packagegroup-agl-demo
+  → udisks2 → libblockdev → parted (GPL-3.0-or-later) ← BLOCKED
+```
+
+**Bitbake error:**
+```
+ERROR: Nothing PROVIDES 'parted'
+    (libblockdev DEPENDS on or otherwise requires it)
+ERROR: Required build target 'agl-ivi-demo-qt' has no buildable providers.
+```
+
+**Impact:** The demo UI layer (Qt IVI control panel, disk management via
+udisks2) is not GPLv3-free. Projects requiring a strict GPLv3-free image
+must stop at the `agl-ivi-image` tier.
+
+**Mitigation options:**
+1. Patch `libblockdev` to make `parted` an optional dep (`PACKAGECONFIG`).
+2. Replace `parted` with a GPL-2.0 disk partitioning library (no drop-in exists
+   in OpenEmbedded as of Scarthgap 5.0).
+3. Remove `udisks2` from the demo packagegroup (loses automount/D-Bus storage).
+4. **Selected baseline approach:** Use `agl-ivi-image` as the production target
+   and document the demo UI layer as a GPLv3-encumbered optional component.
+
+---
+
 ## 10. kbd-keymaps incorrectly excluded — caused systemd-vconsole-setup failure *(RESOLVED in Phase 3)*
 
 **Issue:** Early config set `BAD_RECOMMENDATIONS += "... kbd kbd-keymaps ..."`.
